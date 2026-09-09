@@ -154,32 +154,20 @@ const char *evict_select_victim(evict_ctx *ctx, size_t *key_len)
         return NULL;
     }
     list_node *node = list_head(ctx->entries);
-    list_node *victim = node;
     evict_entry *victim_entry = (evict_entry *)node->data;
-    if (ctx->policy == EVICT_LRU) {
-        time_t earliest = victim_entry->last_access;
-        node = node->next;
-        while (node) {
-            evict_entry *e = (evict_entry *)node->data;
-            if (e->last_access < earliest) {
-                earliest = e->last_access;
-                victim = node;
+    node = node->next;
+    while (node) {
+        evict_entry *e = (evict_entry *)node->data;
+        if (ctx->policy == EVICT_LRU) {
+            if (e->last_access < victim_entry->last_access) {
                 victim_entry = e;
             }
-            node = node->next;
-        }
-    } else if (ctx->policy == EVICT_LFU) {
-        unsigned int min_count = victim_entry->access_count;
-        node = node->next;
-        while (node) {
-            evict_entry *e = (evict_entry *)node->data;
-            if (e->access_count < min_count) {
-                min_count = e->access_count;
-                victim = node;
+        } else if (ctx->policy == EVICT_LFU) {
+            if (e->access_count < victim_entry->access_count) {
                 victim_entry = e;
             }
-            node = node->next;
         }
+        node = node->next;
     }
     if (key_len) *key_len = victim_entry->key_len;
     return victim_entry->key;
