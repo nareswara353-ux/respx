@@ -1,0 +1,7 @@
+function(kave_enable_sanitizers TARGET)
+    if(SANITIZE)
+        target_compile_options(${TARGET} PRIVATE -fsanitize=address,undefined -g -O1)
+        target_link_options(${TARGET} PRIVATE -fsanitize=address,undefined)
+        target_compile_definitions(${TARGET} PRIVATE KAVE_SANITIZE)
+    endif()
+endfunction()
