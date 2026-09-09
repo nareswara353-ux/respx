@@ -9,6 +9,9 @@
 #include <string.h>
 #include <signal.h>
 #include <stdio.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #define BACKLOG 1024
 #define READ_BUF_SIZE 8192
