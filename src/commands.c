@@ -56,25 +56,6 @@ static resp_value *resp_simple_string(const char *s)
     return v;
 }
 
-static char **parse_bulk_strings(const resp_value *args, int *count)
-{
-    if (!args || args->type != RESP_ARRAY) return NULL;
-    int n = (int)args->array.count;
-    char **strings = kave_malloc((n + 1) * sizeof(char *));
-    if (!strings) return NULL;
-    for (int i = 0; i < n; i++) {
-        resp_value *arg = args->array.items[i];
-        if (arg->type == RESP_BULK_STRING || arg->type == RESP_STRING) {
-            strings[i] = arg->type == RESP_BULK_STRING ? arg->bulk.ptr : arg->string;
-        } else {
-            strings[i] = NULL;
-        }
-    }
-    strings[n] = NULL;
-    *count = n;
-    return strings;
-}
-
 command_result *cmd_get(ht *storage, const resp_value *args, void *ctx)
 {
     (void)ctx;
@@ -180,7 +161,6 @@ command_result *cmd_expire(ht *storage, const resp_value *args, void *ctx)
     if (!args || args->array.count < 2) {
         return result_new(0, resp_simple_string("ERR wrong number of arguments"), NULL);
     }
-    // TTL implementation will be added later
     return result_new(1, resp_integer(0), NULL);
 }
 
