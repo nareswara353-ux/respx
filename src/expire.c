@@ -103,7 +103,7 @@ static int expire_find_entry(expire_ctx *ctx, const char *key, size_t key_len, l
             if (out_entry) *out_entry = e;
             return 1;
         }
-        node = list_next(node);
+        node = node->next;
     }
     return 0;
 }
@@ -166,7 +166,7 @@ void expire_check_active(expire_ctx *ctx, void (*on_expire)(const char *key, siz
         list *l = ctx->buckets[i];
         list_node *node = list_head(l);
         while (node) {
-            list_node *next = list_next(node);
+            list_node *next = node->next;
             expire_entry *e = (expire_entry *)node->data;
             if (e->expire_at <= now) {
                 on_expire(e->key, e->key_len, user);
@@ -187,7 +187,7 @@ void expire_passive_cleanup(expire_ctx *ctx, size_t max_checks)
         list *l = ctx->buckets[i];
         list_node *node = list_head(l);
         while (node && checked < max_checks) {
-            list_node *next = list_next(node);
+            list_node *next = node->next;
             expire_entry *e = (expire_entry *)node->data;
             if (e->expire_at <= now) {
                 list_delete_node(l, node);
