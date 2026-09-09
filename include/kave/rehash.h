@@ -1,7 +1,9 @@
 #ifndef KAVE_REHASH_H
 #define KAVE_REHASH_H
 
-#include "kave/hash_table.h"
+#include <stddef.h>
+
+typedef struct ht ht;
 
 typedef struct rehash_ctx {
     ht *old_table;
@@ -10,11 +12,12 @@ typedef struct rehash_ctx {
     int in_progress;
 } rehash_ctx;
 
-void rehash_init(rehash_ctx *ctx, ht *old_ht, size_t new_size);
-int rehash_step(rehash_ctx *ctx, int steps);
+rehash_ctx *rehash_ctx_new(ht *old_table, size_t new_size);
+void rehash_ctx_free(rehash_ctx *ctx);
+int rehash_step(rehash_ctx *ctx, size_t steps);
 int rehash_complete(const rehash_ctx *ctx);
-void rehash_cleanup(rehash_ctx *ctx);
-ht *rehash_get_current_table(const rehash_ctx *ctx);
-ht *rehash_get_old_table(const rehash_ctx *ctx);
+void *rehash_find(const rehash_ctx *ctx, const char *key, size_t key_len);
+int rehash_insert(rehash_ctx *ctx, const char *key, size_t key_len, void *value);
+int rehash_delete(rehash_ctx *ctx, const char *key, size_t key_len);
 
 #endif
