@@ -22,13 +22,15 @@ int list_push_head(list *l, void *data);
 int list_push_tail(list *l, void *data);
 void *list_pop_head(list *l);
 void *list_pop_tail(list *l);
-void *list_remove_node(list *l, list_node *node);
+int list_insert_before(list *l, list_node *node, void *data);
+int list_insert_after(list *l, list_node *node, void *data);
+int list_delete(list *l, list_node *node);
 list_node *list_find(const list *l, const void *data, int (*cmp)(const void *, const void *));
-void list_foreach(const list *l, void (*callback)(void *data, void *userdata), void *userdata);
-size_t list_length(const list *l);
 list_node *list_head(const list *l);
 list_node *list_tail(const list *l);
 list_node *list_next(const list_node *node);
 list_node *list_prev(const list_node *node);
+size_t list_length(const list *l);
+void list_foreach(const list *l, void (*callback)(void *data, void *userdata), void *userdata);
 
 #endif
