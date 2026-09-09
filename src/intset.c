@@ -48,7 +48,6 @@ static int intset_search(const intset *is, int64_t value, uint32_t *pos)
         if (pos) *pos = 0;
         return 0;
     }
-    size_t sz = intset_encoding_size(is->encoding);
     uint32_t lo = 0, hi = is->length - 1;
     while (lo <= hi) {
         uint32_t mid = (lo + hi) / 2;
@@ -78,21 +77,10 @@ static int intset_search(const intset *is, int64_t value, uint32_t *pos)
     return 0;
 }
 
-static void *intset_realloc_contents(intset *is, size_t old_len, size_t new_len)
-{
-    size_t sz = intset_encoding_size(is->encoding);
-    void *new_contents = kave_realloc(is->contents, new_len * sz);
-    if (!new_contents) return NULL;
-    if (new_len > old_len) {
-        memset((char *)new_contents + old_len * sz, 0, (new_len - old_len) * sz);
-    }
-    return new_contents;
-}
-
 intset *intset_add(intset *is, int64_t value)
 {
     if (!is) return NULL;
-    uint32_t pos;
+    uint32_t pos = 0;
     int found = intset_search(is, value, &pos);
     if (found) return is;
     uint32_t new_enc = intset_encoding_for_value(value);
@@ -120,6 +108,7 @@ intset *intset_add(intset *is, int64_t value)
         }
         kave_free(is->contents);
         is->contents = new_contents;
+        (void)old_sz;
     }
     if (pos < is->length) {
         size_t sz = intset_encoding_size(is->encoding);
