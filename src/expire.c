@@ -29,14 +29,6 @@ static uint64_t expire_hash(const char *key, size_t len)
     return h;
 }
 
-static int expire_entry_cmp(const void *a, const void *b)
-{
-    const expire_entry *ea = (const expire_entry *)a;
-    const expire_entry *eb = (const expire_entry *)b;
-    if (ea->key_len != eb->key_len) return -1;
-    return memcmp(ea->key, eb->key, ea->key_len);
-}
-
 static expire_entry *expire_entry_new(const char *key, size_t key_len, time_t ttl)
 {
     expire_entry *e = kave_malloc(sizeof(expire_entry));
