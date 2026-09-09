@@ -23,16 +23,6 @@ struct evict_ctx {
     unsigned int access_counter;
 };
 
-static uint64_t evict_hash(const char *key, size_t len)
-{
-    uint64_t h = 0x811c9dc5;
-    for (size_t i = 0; i < len; i++) {
-        h ^= (uint8_t)key[i];
-        h *= 0x01000193;
-    }
-    return h;
-}
-
 static evict_entry *evict_entry_new(const char *key, size_t key_len, size_t memory)
 {
     evict_entry *e = kave_malloc(sizeof(evict_entry));
@@ -58,14 +48,6 @@ static void evict_entry_free(evict_entry *e)
     kave_free(e);
 }
 
-static int evict_entry_cmp(const void *a, const void *b)
-{
-    const evict_entry *ea = (const evict_entry *)a;
-    const evict_entry *eb = (const evict_entry *)b;
-    if (ea->key_len != eb->key_len) return -1;
-    return memcmp(ea->key, eb->key, ea->key_len);
-}
-
 evict_ctx *evict_new(evict_policy policy, size_t max_memory_bytes)
 {
     evict_ctx *ctx = kave_malloc(sizeof(evict_ctx));
@@ -85,7 +67,13 @@ evict_ctx *evict_new(evict_policy policy, size_t max_memory_bytes)
 void evict_free(evict_ctx *ctx)
 {
     if (!ctx) return;
-    list_foreach(ctx->entries, (void (*)(void *, void *))evict_entry_free, NULL);
+    list_node *node = list_head(ctx->entries);
+    while (node) {
+        list_node *next = node->next;
+        evict_entry *e = (evict_entry *)node->data;
+        evict_entry_free(e);
+        node = next;
+    }
     list_free(ctx->entries);
     kave_free(ctx);
 }
