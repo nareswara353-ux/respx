@@ -74,10 +74,12 @@ void expire_free(expire_ctx *ctx)
 {
     if (!ctx) return;
     for (int i = 0; i < EXPIRE_BUCKETS; i++) {
-        if (ctx->buckets[i]) {
-            list_foreach(ctx->buckets[i], (void (*)(void *, void *))expire_entry_free, NULL);
-            list_free(ctx->buckets[i]);
+        list *l = ctx->buckets[i];
+        while (list_head(l)) {
+            expire_entry *e = (expire_entry *)list_pop_head(l);
+            expire_entry_free(e);
         }
+        list_free(l);
     }
     kave_free(ctx);
 }
