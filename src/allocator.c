@@ -1,6 +1,7 @@
 #include "kave/allocator.h"
 #include <stdlib.h>
 #include <pthread.h>
+#include <malloc.h>
 
 static pthread_mutex_t alloc_mutex = PTHREAD_MUTEX_INITIALIZER;
 static kave_alloc_stats stats = {0, 0, 0, 0};
