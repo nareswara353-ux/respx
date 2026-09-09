@@ -1,5 +1,6 @@
 #include "kave/resp_parser.h"
 #include "kave/allocator.h"
+#include "kave/sds.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -7,14 +8,6 @@
 
 #define RESP_PARSE_INITIAL 4096
 #define RESP_PARSE_MAX 1048576
-
-struct resp_parser {
-    char *buffer;
-    size_t buf_len;
-    size_t buf_cap;
-    size_t pos;
-    int state;
-};
 
 static int resp_parser_grow(resp_parser *p, size_t needed)
 {
