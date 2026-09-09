@@ -1,0 +1,24 @@
+name: CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y valgrind
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_C_COMPILER=${{ matrix.compiler }} -DCMAKE_BUILD_TYPE=Debug -DSANITIZE=ON
+      - name: Build
+        run: cmake --build build -j $(nproc)
+      - name: Run unit tests with ASan/UBSan
+        run: cd build && ctest --output-on-failure
+      - name: Run Valgrind (memory leak check)
+        run: valgrind --leak-check=full --error-exitcode=1 ./build/kave-server --test
