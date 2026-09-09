@@ -6,6 +6,7 @@
 typedef char *sds;
 
 sds sds_new(const char *init);
+sds sds_new_len(const char *init, size_t init_len);
 void sds_free(sds s);
 size_t sds_len(const sds s);
 size_t sds_avail(const sds s);

@@ -14,7 +14,7 @@ struct sds_hdr {
     char buf[];
 };
 
-static sds sds_new_len(const char *init, size_t init_len)
+sds sds_new_len(const char *init, size_t init_len)
 {
     struct sds_hdr *h;
     size_t alloc = init_len + 1;
