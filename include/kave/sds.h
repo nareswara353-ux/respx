@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-typedef struct sds *sds;
+typedef char *sds;
 
 sds sds_new(const char *init);
 void sds_free(sds s);
