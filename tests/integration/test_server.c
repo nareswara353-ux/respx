@@ -41,8 +41,15 @@ static resp_value *make_bulk(const char *s)
     resp_value *v = kave_malloc(sizeof(resp_value));
     if (!v) return NULL;
     v->type = RESP_BULK_STRING;
-    v->bulk.ptr = sds_new(s);
-    v->bulk.len = strlen(s);
+    size_t len = s ? strlen(s) : 0;
+    v->bulk.ptr = kave_malloc(len + 1);
+    if (!v->bulk.ptr) {
+        kave_free(v);
+        return NULL;
+    }
+    if (s) memcpy(v->bulk.ptr, s, len);
+    v->bulk.ptr[len] = '\0';
+    v->bulk.len = len;
     return v;
 }
 
