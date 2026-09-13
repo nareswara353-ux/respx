@@ -1,5 +1,6 @@
 #include "kave/skiplist.h"
 #include "kave/allocator.h"
+#include "kave/sds.h"
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
@@ -49,7 +50,7 @@ static void sl_free_node(skiplist_node *node)
 {
     if (!node) return;
     if (node->key) kave_free(node->key);
-    if (node->value) kave_free(node->value);
+    if (node->value) sds_free((sds)node->value);
     if (node->forward) kave_free(node->forward);
     kave_free(node);
 }
@@ -110,7 +111,7 @@ int sl_insert(skiplist *list, double score, const char *key, void *value)
     }
     cur = cur->forward[0];
     if (cur && cur->score == score && strcmp(cur->key, key) == 0) {
-        if (cur->value) kave_free(cur->value);
+        if (cur->value) sds_free((sds)cur->value);
         cur->value = value;
         return 0;
     }
