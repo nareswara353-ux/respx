@@ -24,7 +24,7 @@ static void benchmark_ht_set(int iterations)
     for (int i = 0; i < iterations; i++) {
         snprintf(key, sizeof(key), "key_%d", i);
         char *val = sds_new(key);
-        ht_insert(table, key, strlen(key), val);
+        ht_insert(table, key, strlen(key), val, HT_VAL_SDS);
     }
     clock_gettime(CLOCK_MONOTONIC, &end);
     double secs = elapsed_seconds(&start, &end);
@@ -40,7 +40,7 @@ static void benchmark_ht_get(int iterations)
     for (int i = 0; i < iterations; i++) {
         snprintf(key, sizeof(key), "key_%d", i);
         char *val = sds_new(key);
-        ht_insert(table, key, strlen(key), val);
+        ht_insert(table, key, strlen(key), val, HT_VAL_SDS);
     }
     struct timespec start, end;
     volatile size_t hits = 0;
@@ -64,7 +64,7 @@ static void benchmark_ht_del(int iterations)
     for (int i = 0; i < iterations; i++) {
         snprintf(key, sizeof(key), "key_%d", i);
         char *val = sds_new(key);
-        ht_insert(table, key, strlen(key), val);
+        ht_insert(table, key, strlen(key), val, HT_VAL_SDS);
     }
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
