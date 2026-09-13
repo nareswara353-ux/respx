@@ -1,6 +1,12 @@
 #include "kave/server.h"
 #include "kave/signal.h"
 #include "kave/allocator.h"
+#include "kave/sds.h"
+#include "kave/hash_table.h"
+#include "kave/skiplist.h"
+#include "kave/list.h"
+#include "kave/intset.h"
+#include "kave/resp_parser.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,6 +27,7 @@ static void print_usage(const char *prog)
     printf("  -a, --aof                    Enable AOF persistence\n");
     printf("  -e, --eviction <policy>      Eviction: lru|lfu|none\n");
     printf("  -h, --help                   Show this help\n");
+    printf("      --test                   Run self-test and exit\n");
 }
 
 static int parse_eviction_policy(const char *s)
@@ -30,8 +37,109 @@ static int parse_eviction_policy(const char *s)
     return 0;
 }
 
+static int run_self_test(void)
+{
+    sds s = sds_new("hello");
+    if (!s) return 1;
+    s = sds_append(s, " world");
+    if (!s) return 1;
+    if (sds_len(s) != 11) {
+        sds_free(s);
+        return 1;
+    }
+    sds_free(s);
+
+    ht *table = ht_new(16);
+    if (!table) return 1;
+    char *val = sds_new("value1");
+    if (!val) {
+        ht_free(table);
+        return 1;
+    }
+    if (ht_insert(table, "key1", 4, val) < 0) {
+        sds_free(val);
+        ht_free(table);
+        return 1;
+    }
+    void *found = ht_find(table, "key1", 4);
+    if (!found || strcmp((char *)found, "value1") != 0) {
+        ht_free(table);
+        return 1;
+    }
+    ht_free(table);
+
+    skiplist *sl = sl_new();
+    if (!sl) return 1;
+    char *member = sds_new("member1");
+    if (!member) {
+        sl_free(sl);
+        return 1;
+    }
+    if (sl_insert(sl, 1.5, "member1", member) < 0) {
+        sds_free(member);
+        sl_free(sl);
+        return 1;
+    }
+    if (sl_count(sl) != 1) {
+        sl_free(sl);
+        return 1;
+    }
+    sl_free(sl);
+
+    list *l = list_new();
+    if (!l) return 1;
+    int *data = malloc(sizeof(int));
+    if (!data) {
+        list_free(l);
+        return 1;
+    }
+    *data = 42;
+    list_append(l, data);
+    list_free(l);
+
+    intset *is = intset_new();
+    if (!is) return 1;
+    is = intset_add(is, 10);
+    is = intset_add(is, 20);
+    is = intset_add(is, 30);
+    if (!is || intset_len(is) != 3) {
+        if (is) intset_free(is);
+        return 1;
+    }
+    if (!intset_find(is, 20)) {
+        intset_free(is);
+        return 1;
+    }
+    intset_free(is);
+
+    resp_parser *p = resp_parser_new();
+    if (!p) return 1;
+    const char *input = "*1\r\n$4\r\nPING\r\n";
+    if (resp_parser_feed(p, input, strlen(input)) < 0) {
+        resp_parser_free(p);
+        return 1;
+    }
+    resp_value *v = resp_parser_parse(p);
+    if (!v) {
+        resp_parser_free(p);
+        return 1;
+    }
+    resp_value_free(v);
+    resp_parser_free(p);
+
+    kave_alloc_stats stats = kave_get_global_stats();
+    if (stats.active_bytes != 0 || stats.active_blocks != 0) {
+        fprintf(stderr, "Self-test leak: %zu bytes in %zu blocks\n",
+                stats.active_bytes, stats.active_blocks);
+        return 1;
+    }
+    printf("self-test: OK\n");
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
+    int run_test = 0;
     server_config cfg;
     cfg.port = DEFAULT_PORT;
     cfg.max_clients = DEFAULT_MAX_CLIENTS;
@@ -52,6 +160,7 @@ int main(int argc, char **argv)
         {"aof", 'a', 0},
         {"eviction", 'e', 1},
         {"help", 'h', 0},
+        {"test", 0, 0},
         {NULL, 0, 0}
     };
     for (int i = 1; i < argc; i++) {
@@ -81,6 +190,10 @@ int main(int argc, char **argv)
             print_usage(argv[0]);
             return 0;
         }
+        if (strcmp(options[matched].long_opt, "test") == 0) {
+            run_test = 1;
+            continue;
+        }
         if (options[matched].has_arg) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "Option %s requires argument\n", arg);
@@ -103,6 +216,9 @@ int main(int argc, char **argv)
                 cfg.enable_aof = 1;
             }
         }
+    }
+    if (run_test) {
+        return run_self_test();
     }
     if (cfg.port <= 0 || cfg.port > 65535) {
         fprintf(stderr, "Invalid port: %d\n", cfg.port);
