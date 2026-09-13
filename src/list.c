@@ -146,7 +146,6 @@ int list_delete_node(list *l, list_node *node)
     } else {
         l->tail = node->prev;
     }
-    if (node->data) kave_free(node->data);
     kave_free(node);
     l->length--;
     return 0;
