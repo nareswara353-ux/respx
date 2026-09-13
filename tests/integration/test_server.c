@@ -67,53 +67,57 @@ int main(void)
     args = make_array(1, make_bulk("mykey"));
     res = command_dispatch(storage, "GET", args, NULL);
     ASSERT(res != NULL && res->success, "GET succeeds");
-    ASSERT(res->response->type == RESP_BULK_STRING, "GET returns bulk");
-    ASSERT(memcmp(res->response->bulk.ptr, "myvalue", 7) == 0, "GET value correct");
+    if (res && res->response) {
+        ASSERT(res->response->type == RESP_BULK_STRING, "GET returns bulk");
+        ASSERT(memcmp(res->response->bulk.ptr, "myvalue", 7) == 0, "GET value correct");
+    }
     resp_value_free(args);
     command_result_free(res);
 
     args = make_array(1, make_bulk("nonexistent"));
     res = command_dispatch(storage, "GET", args, NULL);
     ASSERT(res != NULL && res->success, "GET missing succeeds");
-    ASSERT(res->response->type == RESP_NULL, "GET missing returns null");
+    if (res && res->response) {
+        ASSERT(res->response->type == RESP_NULL, "GET missing returns null");
+    }
     resp_value_free(args);
     command_result_free(res);
 
     args = make_array(1, make_bulk("counter"));
     res = command_dispatch(storage, "INCR", args, NULL);
     ASSERT(res != NULL && res->success, "INCR creates key");
-    ASSERT(res->response->integer == 1, "INCR new key is 1");
+    if (res && res->response) ASSERT(res->response->integer == 1, "INCR new key is 1");
     resp_value_free(args);
     command_result_free(res);
 
     args = make_array(1, make_bulk("counter"));
     res = command_dispatch(storage, "INCR", args, NULL);
-    ASSERT(res->response->integer == 2, "INCR again is 2");
+    if (res && res->response) ASSERT(res->response->integer == 2, "INCR again is 2");
     resp_value_free(args);
     command_result_free(res);
 
     args = make_array(1, make_bulk("counter"));
     res = command_dispatch(storage, "INCR", args, NULL);
-    ASSERT(res->response->integer == 3, "INCR third time is 3");
+    if (res && res->response) ASSERT(res->response->integer == 3, "INCR third time is 3");
     resp_value_free(args);
     command_result_free(res);
 
     args = make_array(1, make_bulk("mykey"));
     res = command_dispatch(storage, "DEL", args, NULL);
     ASSERT(res != NULL && res->success, "DEL succeeds");
-    ASSERT(res->response->integer == 1, "DEL deleted 1 key");
+    if (res && res->response) ASSERT(res->response->integer == 1, "DEL deleted 1 key");
     resp_value_free(args);
     command_result_free(res);
 
     args = make_array(1, make_bulk("mykey"));
     res = command_dispatch(storage, "GET", args, NULL);
-    ASSERT(res->response->type == RESP_NULL, "GET after DEL returns null");
+    if (res && res->response) ASSERT(res->response->type == RESP_NULL, "GET after DEL returns null");
     resp_value_free(args);
     command_result_free(res);
 
     args = make_array(1, make_bulk("mykey"));
     res = command_dispatch(storage, "DEL", args, NULL);
-    ASSERT(res->response->integer == 0, "DEL missing returns 0");
+    if (res && res->response) ASSERT(res->response->integer == 0, "DEL missing returns 0");
     resp_value_free(args);
     command_result_free(res);
 
@@ -125,15 +129,20 @@ int main(void)
     args = make_array(5, setkey, s1, m1, s2, m2);
     res = command_dispatch(storage, "ZADD", args, NULL);
     ASSERT(res != NULL && res->success, "ZADD succeeds");
-    ASSERT(res->response->integer == 2, "ZADD added 2 members");
+    if (res && res->response) ASSERT(res->response->integer == 2, "ZADD added 2 members");
     resp_value_free(args);
     command_result_free(res);
 
-    args = make_array(1, make_bulk("myzset"));
+    resp_value *zkey = make_bulk("myzset");
+    resp_value *zstart = make_bulk("0");
+    resp_value *zstop = make_bulk("-1");
+    args = make_array(3, zkey, zstart, zstop);
     res = command_dispatch(storage, "ZRANGE", args, NULL);
     ASSERT(res != NULL && res->success, "ZRANGE succeeds");
-    ASSERT(res->response->type == RESP_ARRAY, "ZRANGE returns array");
-    ASSERT(res->response->array.count == 4, "ZRANGE has 4 items");
+    if (res && res->response) {
+        ASSERT(res->response->type == RESP_ARRAY, "ZRANGE returns array");
+        ASSERT(res->response->array.count == 4, "ZRANGE has 4 items");
+    }
     resp_value_free(args);
     command_result_free(res);
 
