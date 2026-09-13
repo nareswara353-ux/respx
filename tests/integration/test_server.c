@@ -5,6 +5,7 @@
 #include "kave/sds.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 
 static int failures = 0;
 
@@ -20,7 +21,7 @@ static resp_value *make_array(int count, ...)
     resp_value *arr = kave_malloc(sizeof(resp_value));
     if (!arr) return NULL;
     arr->type = RESP_ARRAY;
-    arr->array.items = kave_malloc(sizeof(resp_value *) * count);
+    arr->array.items = kave_malloc(sizeof(resp_value *) * (count > 0 ? count : 1));
     if (!arr->array.items) {
         kave_free(arr);
         return NULL;
@@ -109,7 +110,6 @@ int main(void)
     resp_value_free(args);
     command_result_free(res);
 
-    resp_value *cmd_zadd = make_bulk("ZADD");
     resp_value *setkey = make_bulk("myzset");
     resp_value *s1 = make_bulk("1.5");
     resp_value *m1 = make_bulk("alice");
@@ -119,25 +119,20 @@ int main(void)
     res = command_dispatch(storage, "ZADD", args, NULL);
     ASSERT(res != NULL && res->success, "ZADD succeeds");
     ASSERT(res->response->integer == 2, "ZADD added 2 members");
-    resp_value_free(cmd_zadd);
     resp_value_free(args);
     command_result_free(res);
 
-    resp_value *dummy = make_bulk("dummy");
     args = make_array(1, make_bulk("myzset"));
     res = command_dispatch(storage, "ZRANGE", args, NULL);
     ASSERT(res != NULL && res->success, "ZRANGE succeeds");
     ASSERT(res->response->type == RESP_ARRAY, "ZRANGE returns array");
-    ASSERT(res->response->array.count == 4, "ZRANGE has 4 items (member+score x2)");
-    resp_value_free(dummy);
+    ASSERT(res->response->array.count == 4, "ZRANGE has 4 items");
     resp_value_free(args);
     command_result_free(res);
 
-    resp_value *unknown = make_bulk("UNKNOWN");
     args = make_array(0);
     res = command_dispatch(storage, "UNKNOWNCMD", args, NULL);
     ASSERT(res != NULL && !res->success, "unknown command fails");
-    resp_value_free(unknown);
     resp_value_free(args);
     command_result_free(res);
 
