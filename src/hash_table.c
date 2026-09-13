@@ -1,5 +1,6 @@
 #include "kave/hash_table.h"
 #include "kave/allocator.h"
+#include "kave/sds.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -48,7 +49,7 @@ void ht_free(ht *table)
         ht_entry *e = &table->entries[i];
         if (e->key) {
             kave_free(e->key);
-            if (e->value) kave_free(e->value);
+            if (e->value) sds_free((sds)e->value);
         }
     }
     kave_free(table->entries);
@@ -90,7 +91,7 @@ int ht_insert(ht *table, const char *key, size_t key_len, void *value)
     if (slot >= table->size) return -1;
     ht_entry *e = &table->entries[slot];
     if (e->key) {
-        if (e->value) kave_free(e->value);
+        if (e->value) sds_free((sds)e->value);
         e->value = value;
         return 0;
     }
@@ -126,7 +127,7 @@ int ht_delete(ht *table, const char *key, size_t key_len)
     kave_free(e->key);
     e->key = NULL;
     if (e->value) {
-        kave_free(e->value);
+        sds_free((sds)e->value);
         e->value = NULL;
     }
     table->used--;
@@ -158,7 +159,7 @@ void ht_rehash(ht *table, size_t new_size)
                 table->used++;
             } else {
                 kave_free(e->key);
-                if (e->value) kave_free(e->value);
+                if (e->value) sds_free((sds)e->value);
             }
         }
     }
