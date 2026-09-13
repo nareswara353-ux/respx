@@ -88,7 +88,7 @@ static int run_self_test(void)
 
     list *l = list_new();
     if (!l) return 1;
-    int *data = malloc(sizeof(int));
+    int *data = kave_malloc(sizeof(int));
     if (!data) {
         list_free(l);
         return 1;
@@ -100,10 +100,13 @@ static int run_self_test(void)
     intset *is = intset_new();
     if (!is) return 1;
     is = intset_add(is, 10);
+    if (!is) return 1;
     is = intset_add(is, 20);
+    if (!is) return 1;
     is = intset_add(is, 30);
-    if (!is || intset_len(is) != 3) {
-        if (is) intset_free(is);
+    if (!is) return 1;
+    if (intset_len(is) != 3) {
+        intset_free(is);
         return 1;
     }
     if (!intset_find(is, 20)) {
