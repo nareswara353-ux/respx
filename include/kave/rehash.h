@@ -17,7 +17,7 @@ void rehash_ctx_free(rehash_ctx *ctx);
 int rehash_step(rehash_ctx *ctx, size_t steps);
 int rehash_complete(const rehash_ctx *ctx);
 void *rehash_find(const rehash_ctx *ctx, const char *key, size_t key_len);
-int rehash_insert(rehash_ctx *ctx, const char *key, size_t key_len, void *value);
+int rehash_insert(rehash_ctx *ctx, const char *key, size_t key_len, void *value, int value_kind);
 int rehash_delete(rehash_ctx *ctx, const char *key, size_t key_len);
 
 #endif
