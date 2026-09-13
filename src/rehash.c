@@ -35,11 +35,12 @@ static void rehash_move_entry(rehash_ctx *ctx, size_t idx)
 {
     ht_entry *e = &ctx->old_table->entries[idx];
     if (!e->key || e->deleted) return;
-    ht_insert(ctx->new_table, e->key, e->key_len, e->value);
+    ht_insert(ctx->new_table, e->key, e->key_len, e->value, e->value_kind);
     e->deleted = 1;
     kave_free(e->key);
     e->key = NULL;
     e->value = NULL;
+    e->value_kind = HT_VAL_NONE;
     ctx->old_table->used--;
 }
 
@@ -75,10 +76,10 @@ void *rehash_find(const rehash_ctx *ctx, const char *key, size_t key_len)
     return ht_find(ctx->old_table, key, key_len);
 }
 
-int rehash_insert(rehash_ctx *ctx, const char *key, size_t key_len, void *value)
+int rehash_insert(rehash_ctx *ctx, const char *key, size_t key_len, void *value, int value_kind)
 {
     if (!ctx || !key) return -1;
-    int r = ht_insert(ctx->new_table, key, key_len, value);
+    int r = ht_insert(ctx->new_table, key, key_len, value, value_kind);
     if (r == 0) {
         ht_delete(ctx->old_table, key, key_len);
     }
