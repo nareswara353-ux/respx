@@ -11,9 +11,10 @@ void *kave_malloc(size_t size)
     if (size == 0) return NULL;
     void *ptr = malloc(size);
     if (!ptr) return NULL;
+    size_t actual = malloc_usable_size(ptr);
     pthread_mutex_lock(&alloc_mutex);
-    stats.total_allocated += size;
-    stats.active_bytes += size;
+    stats.total_allocated += actual;
+    stats.active_bytes += actual;
     stats.active_blocks++;
     pthread_mutex_unlock(&alloc_mutex);
     return ptr;
@@ -21,13 +22,13 @@ void *kave_malloc(size_t size)
 
 void *kave_calloc(size_t nmemb, size_t size)
 {
-    size_t total = nmemb * size;
-    if (total == 0) return NULL;
+    if (nmemb == 0 || size == 0) return NULL;
     void *ptr = calloc(nmemb, size);
     if (!ptr) return NULL;
+    size_t actual = malloc_usable_size(ptr);
     pthread_mutex_lock(&alloc_mutex);
-    stats.total_allocated += total;
-    stats.active_bytes += total;
+    stats.total_allocated += actual;
+    stats.active_bytes += actual;
     stats.active_blocks++;
     pthread_mutex_unlock(&alloc_mutex);
     return ptr;
@@ -43,9 +44,10 @@ void *kave_realloc(void *ptr, size_t new_size)
     size_t old_size = malloc_usable_size(ptr);
     void *new_ptr = realloc(ptr, new_size);
     if (!new_ptr) return NULL;
+    size_t new_actual = malloc_usable_size(new_ptr);
     pthread_mutex_lock(&alloc_mutex);
     stats.active_bytes -= old_size;
-    stats.active_bytes += new_size;
+    stats.active_bytes += new_actual;
     pthread_mutex_unlock(&alloc_mutex);
     return new_ptr;
 }
