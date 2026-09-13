@@ -3,6 +3,7 @@ set(UNIT_TESTS
     unit/test_hash.c
     unit/test_skiplist.c
     unit/test_resp.c
+    unit/test_list.c
 )
 
 foreach(test_src ${UNIT_TESTS})
