@@ -87,12 +87,10 @@ intset *intset_add(intset *is, int64_t value)
     if (new_enc > is->encoding) {
         uint32_t old_enc = is->encoding;
         is->encoding = new_enc;
-        size_t old_sz = intset_encoding_size(old_enc);
         size_t new_sz = intset_encoding_size(new_enc);
         void *new_contents = kave_malloc((is->length + 1) * new_sz);
         if (!new_contents) return NULL;
-        size_t old_len = is->length;
-        for (uint32_t i = 0; i < old_len; i++) {
+        for (uint32_t i = 0; i < is->length; i++) {
             int64_t val;
             switch (old_enc) {
                 case INTSET_ENC_INT16: val = (int64_t)((int16_t *)is->contents)[i]; break;
@@ -108,7 +106,11 @@ intset *intset_add(intset *is, int64_t value)
         }
         kave_free(is->contents);
         is->contents = new_contents;
-        (void)old_sz;
+    } else {
+        size_t sz = intset_encoding_size(is->encoding);
+        void *new_contents = kave_realloc(is->contents, (is->length + 1) * sz);
+        if (!new_contents) return NULL;
+        is->contents = new_contents;
     }
     if (pos < is->length) {
         size_t sz = intset_encoding_size(is->encoding);
