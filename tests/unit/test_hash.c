@@ -21,7 +21,7 @@ int main(void)
     ASSERT(ht_count(table) == 0, "new table empty");
 
     char *v1 = sds_new("value1");
-    ASSERT(ht_insert(table, "key1", 4, v1) == 0, "insert key1");
+    ASSERT(ht_insert(table, "key1", 4, v1, HT_VAL_SDS) == 0, "insert key1");
     ASSERT(ht_count(table) == 1, "count is 1 after insert");
 
     void *found = ht_find(table, "key1", 4);
@@ -31,7 +31,7 @@ int main(void)
     ASSERT(ht_find(table, "missing", 7) == NULL, "missing key returns NULL");
 
     char *v1b = sds_new("value1_updated");
-    ASSERT(ht_insert(table, "key1", 4, v1b) == 0, "update existing key");
+    ASSERT(ht_insert(table, "key1", 4, v1b, HT_VAL_SDS) == 0, "update existing key");
     ASSERT(ht_count(table) == 1, "count still 1 after update");
     found = ht_find(table, "key1", 4);
     ASSERT(strcmp((char *)found, "value1_updated") == 0, "value updated");
@@ -46,7 +46,7 @@ int main(void)
     for (int i = 0; i < 100; i++) {
         snprintf(keys[i], sizeof(keys[i]), "key_%d", i);
         values[i] = sds_new(keys[i]);
-        ASSERT(ht_insert(table, keys[i], strlen(keys[i]), values[i]) == 0,
+        ASSERT(ht_insert(table, keys[i], strlen(keys[i]), values[i], HT_VAL_SDS) == 0,
                "bulk insert succeeds");
     }
     ASSERT(ht_count(table) == 100, "count is 100 after bulk insert");
