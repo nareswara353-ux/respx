@@ -1,5 +1,6 @@
 #include "kave/resp_parser.h"
 #include "kave/allocator.h"
+#include "kave/sds.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -108,16 +109,11 @@ int main(void)
     resp_value_free(v);
     resp_parser_free(p);
 
-    char *str = resp_value_to_string((resp_value *)&(resp_value){
-        .type = RESP_INTEGER,
-        .integer = 123
-    });
+    resp_value temp = { .type = RESP_INTEGER, .integer = 123 };
+    char *str = resp_value_to_string(&temp);
     ASSERT(str != NULL, "to_string for integer");
     ASSERT(strcmp(str, "123") == 0, "integer to_string correct");
-    resp_value_free((resp_value *)&(resp_value){.type = RESP_NULL});
-
-    resp_value *temp = resp_parser_new() ? NULL : NULL;
-    (void)temp;
+    sds_free(str);
 
     kave_alloc_stats stats = kave_get_global_stats();
     ASSERT(stats.active_bytes == 0, "no leaked bytes");
