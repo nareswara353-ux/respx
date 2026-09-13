@@ -4,12 +4,18 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define HT_VAL_NONE 0
+#define HT_VAL_SDS 1
+#define HT_VAL_SKIPLIST 2
+#define HT_VAL_RAW 3
+
 typedef struct ht_entry {
     char *key;
     void *value;
     size_t key_len;
     uint64_t hash;
     int deleted;
+    int value_kind;
 } ht_entry;
 
 typedef struct ht {
@@ -23,7 +29,7 @@ typedef struct ht {
 
 ht *ht_new(size_t initial_size);
 void ht_free(ht *table);
-int ht_insert(ht *table, const char *key, size_t key_len, void *value);
+int ht_insert(ht *table, const char *key, size_t key_len, void *value, int value_kind);
 void *ht_find(const ht *table, const char *key, size_t key_len);
 int ht_delete(ht *table, const char *key, size_t key_len);
 void ht_rehash(ht *table, size_t new_size);
