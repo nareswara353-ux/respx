@@ -56,22 +56,31 @@ static resp_value *resp_simple_string(const char *s)
     return v;
 }
 
+static const char *arg_str(const resp_value *v)
+{
+    if (v->type == RESP_BULK_STRING) return v->bulk.ptr;
+    if (v->type == RESP_STRING) return v->string;
+    return NULL;
+}
+
+static size_t arg_len(const resp_value *v)
+{
+    if (v->type == RESP_BULK_STRING) return v->bulk.len;
+    if (v->type == RESP_STRING) return v->string ? strlen(v->string) : 0;
+    return 0;
+}
+
 command_result *cmd_get(ht *storage, const resp_value *args, void *ctx)
 {
     (void)ctx;
     if (!args || args->array.count < 1) {
         return result_new(0, resp_simple_string("ERR wrong number of arguments"), NULL);
     }
-    resp_value *key_arg = args->array.items[0];
-    if (key_arg->type != RESP_BULK_STRING && key_arg->type != RESP_STRING) {
-        return result_new(0, resp_simple_string("ERR invalid key type"), NULL);
-    }
-    const char *key = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.ptr : key_arg->string;
-    size_t key_len = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.len : strlen(key);
+    const char *key = arg_str(args->array.items[0]);
+    if (!key) return result_new(0, resp_simple_string("ERR invalid key type"), NULL);
+    size_t key_len = arg_len(args->array.items[0]);
     void *val = ht_find(storage, key, key_len);
-    if (!val) {
-        return result_new(1, resp_null(), NULL);
-    }
+    if (!val) return result_new(1, resp_null(), NULL);
     return result_new(1, resp_bulk_string((char *)val), NULL);
 }
 
@@ -81,21 +90,16 @@ command_result *cmd_set(ht *storage, const resp_value *args, void *ctx)
     if (!args || args->array.count < 2) {
         return result_new(0, resp_simple_string("ERR wrong number of arguments"), NULL);
     }
-    resp_value *key_arg = args->array.items[0];
-    resp_value *val_arg = args->array.items[1];
-    if ((key_arg->type != RESP_BULK_STRING && key_arg->type != RESP_STRING) ||
-        (val_arg->type != RESP_BULK_STRING && val_arg->type != RESP_STRING)) {
+    const char *key = arg_str(args->array.items[0]);
+    const char *val = arg_str(args->array.items[1]);
+    if (!key || !val) {
         return result_new(0, resp_simple_string("ERR invalid argument type"), NULL);
     }
-    const char *key = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.ptr : key_arg->string;
-    size_t key_len = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.len : strlen(key);
-    const char *val = val_arg->type == RESP_BULK_STRING ? val_arg->bulk.ptr : val_arg->string;
-    size_t val_len = val_arg->type == RESP_BULK_STRING ? val_arg->bulk.len : strlen(val);
+    size_t key_len = arg_len(args->array.items[0]);
+    size_t val_len = arg_len(args->array.items[1]);
     char *val_copy = sds_new_len(val, val_len);
-    if (!val_copy) {
-        return result_new(0, resp_simple_string("ERR memory allocation failed"), NULL);
-    }
-    if (ht_insert(storage, key, key_len, val_copy) < 0) {
+    if (!val_copy) return result_new(0, resp_simple_string("ERR memory allocation failed"), NULL);
+    if (ht_insert(storage, key, key_len, val_copy, HT_VAL_SDS) < 0) {
         sds_free(val_copy);
         return result_new(0, resp_simple_string("ERR failed to insert"), NULL);
     }
@@ -110,13 +114,10 @@ command_result *cmd_del(ht *storage, const resp_value *args, void *ctx)
     }
     int deleted = 0;
     for (size_t i = 0; i < args->array.count; i++) {
-        resp_value *key_arg = args->array.items[i];
-        if (key_arg->type != RESP_BULK_STRING && key_arg->type != RESP_STRING) continue;
-        const char *key = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.ptr : key_arg->string;
-        size_t key_len = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.len : strlen(key);
-        if (ht_delete(storage, key, key_len) == 0) {
-            deleted++;
-        }
+        const char *key = arg_str(args->array.items[i]);
+        if (!key) continue;
+        size_t key_len = arg_len(args->array.items[i]);
+        if (ht_delete(storage, key, key_len) == 0) deleted++;
     }
     return result_new(1, resp_integer(deleted), NULL);
 }
@@ -137,13 +138,12 @@ command_result *cmd_mget(ht *storage, const resp_value *args, void *ctx)
     }
     result->array.count = 0;
     for (size_t i = 0; i < args->array.count; i++) {
-        resp_value *key_arg = args->array.items[i];
-        if (key_arg->type != RESP_BULK_STRING && key_arg->type != RESP_STRING) {
+        const char *key = arg_str(args->array.items[i]);
+        if (!key) {
             result->array.items[result->array.count++] = resp_null();
             continue;
         }
-        const char *key = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.ptr : key_arg->string;
-        size_t key_len = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.len : strlen(key);
+        size_t key_len = arg_len(args->array.items[i]);
         void *val = ht_find(storage, key, key_len);
         if (val) {
             result->array.items[result->array.count++] = resp_bulk_string((char *)val);
@@ -170,12 +170,9 @@ command_result *cmd_incr(ht *storage, const resp_value *args, void *ctx)
     if (!args || args->array.count < 1) {
         return result_new(0, resp_simple_string("ERR wrong number of arguments"), NULL);
     }
-    resp_value *key_arg = args->array.items[0];
-    if (key_arg->type != RESP_BULK_STRING && key_arg->type != RESP_STRING) {
-        return result_new(0, resp_simple_string("ERR invalid key type"), NULL);
-    }
-    const char *key = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.ptr : key_arg->string;
-    size_t key_len = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.len : strlen(key);
+    const char *key = arg_str(args->array.items[0]);
+    if (!key) return result_new(0, resp_simple_string("ERR invalid key type"), NULL);
+    size_t key_len = arg_len(args->array.items[0]);
     void *val = ht_find(storage, key, key_len);
     long long num;
     if (!val) {
@@ -191,11 +188,8 @@ command_result *cmd_incr(ht *storage, const resp_value *args, void *ctx)
     char buf[32];
     snprintf(buf, sizeof(buf), "%lld", num);
     char *new_val = sds_new(buf);
-    if (!new_val) {
-        return result_new(0, resp_simple_string("ERR memory allocation failed"), NULL);
-    }
-    if (val) sds_free(val);
-    if (ht_insert(storage, key, key_len, new_val) < 0) {
+    if (!new_val) return result_new(0, resp_simple_string("ERR memory allocation failed"), NULL);
+    if (ht_insert(storage, key, key_len, new_val, HT_VAL_SDS) < 0) {
         sds_free(new_val);
         return result_new(0, resp_simple_string("ERR failed to insert"), NULL);
     }
@@ -208,33 +202,24 @@ command_result *cmd_zadd(ht *storage, const resp_value *args, void *ctx)
     if (!args || args->array.count < 3) {
         return result_new(0, resp_simple_string("ERR wrong number of arguments"), NULL);
     }
-    resp_value *key_arg = args->array.items[0];
-    if (key_arg->type != RESP_BULK_STRING && key_arg->type != RESP_STRING) {
-        return result_new(0, resp_simple_string("ERR invalid key type"), NULL);
-    }
-    const char *key = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.ptr : key_arg->string;
-    size_t key_len = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.len : strlen(key);
+    const char *key = arg_str(args->array.items[0]);
+    if (!key) return result_new(0, resp_simple_string("ERR invalid key type"), NULL);
+    size_t key_len = arg_len(args->array.items[0]);
     skiplist *zset = (skiplist *)ht_find(storage, key, key_len);
     if (!zset) {
         zset = sl_new();
-        if (!zset) {
-            return result_new(0, resp_simple_string("ERR memory allocation failed"), NULL);
-        }
-        if (ht_insert(storage, key, key_len, zset) < 0) {
+        if (!zset) return result_new(0, resp_simple_string("ERR memory allocation failed"), NULL);
+        if (ht_insert(storage, key, key_len, zset, HT_VAL_SKIPLIST) < 0) {
             sl_free(zset);
             return result_new(0, resp_simple_string("ERR failed to insert"), NULL);
         }
     }
     int added = 0;
     for (size_t i = 1; i + 1 < args->array.count; i += 2) {
-        resp_value *score_arg = args->array.items[i];
-        resp_value *member_arg = args->array.items[i+1];
-        if ((score_arg->type != RESP_BULK_STRING && score_arg->type != RESP_STRING) ||
-            (member_arg->type != RESP_BULK_STRING && member_arg->type != RESP_STRING)) {
-            continue;
-        }
-        double score = strtod(score_arg->type == RESP_BULK_STRING ? score_arg->bulk.ptr : score_arg->string, NULL);
-        const char *member = member_arg->type == RESP_BULK_STRING ? member_arg->bulk.ptr : member_arg->string;
+        const char *score_s = arg_str(args->array.items[i]);
+        const char *member = arg_str(args->array.items[i+1]);
+        if (!score_s || !member) continue;
+        double score = strtod(score_s, NULL);
         char *member_copy = sds_new(member);
         if (!member_copy) continue;
         if (sl_insert(zset, score, member, member_copy) == 0) {
@@ -252,21 +237,16 @@ command_result *cmd_zrange(ht *storage, const resp_value *args, void *ctx)
     if (!args || args->array.count < 3) {
         return result_new(0, resp_simple_string("ERR wrong number of arguments"), NULL);
     }
-    resp_value *key_arg = args->array.items[0];
-    if (key_arg->type != RESP_BULK_STRING && key_arg->type != RESP_STRING) {
-        return result_new(0, resp_simple_string("ERR invalid key type"), NULL);
-    }
-    const char *key = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.ptr : key_arg->string;
-    size_t key_len = key_arg->type == RESP_BULK_STRING ? key_arg->bulk.len : strlen(key);
+    const char *key = arg_str(args->array.items[0]);
+    if (!key) return result_new(0, resp_simple_string("ERR invalid key type"), NULL);
+    size_t key_len = arg_len(args->array.items[0]);
     skiplist *zset = (skiplist *)ht_find(storage, key, key_len);
-    if (!zset) {
-        return result_new(1, resp_simple_string("OK"), NULL);
-    }
+    if (!zset) return result_new(1, resp_simple_string("OK"), NULL);
     resp_value *result = kave_malloc(sizeof(resp_value));
     if (!result) return NULL;
     result->type = RESP_ARRAY;
     size_t count = sl_count(zset);
-    result->array.items = kave_malloc(count * 2 * sizeof(resp_value *));
+    result->array.items = kave_malloc((count * 2 + 1) * sizeof(resp_value *));
     if (!result->array.items) {
         kave_free(result);
         return NULL;
@@ -316,11 +296,7 @@ command_result *command_dispatch(ht *storage, const char *cmd_name, const resp_v
 void command_result_free(command_result *res)
 {
     if (!res) return;
-    if (res->response) {
-        resp_value_free(res->response);
-    }
-    if (res->error_msg) {
-        sds_free(res->error_msg);
-    }
+    if (res->response) resp_value_free(res->response);
+    if (res->error_msg) sds_free(res->error_msg);
     kave_free(res);
 }
