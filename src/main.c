@@ -43,20 +43,14 @@ static int run_self_test(void)
     if (!s) return 1;
     s = sds_append(s, " world");
     if (!s) return 1;
-    if (sds_len(s) != 11) {
-        sds_free(s);
-        return 1;
-    }
+    if (sds_len(s) != 11) { sds_free(s); return 1; }
     sds_free(s);
 
     ht *table = ht_new(16);
     if (!table) return 1;
     char *val = sds_new("value1");
-    if (!val) {
-        ht_free(table);
-        return 1;
-    }
-    if (ht_insert(table, "key1", 4, val) < 0) {
+    if (!val) { ht_free(table); return 1; }
+    if (ht_insert(table, "key1", 4, val, HT_VAL_SDS) < 0) {
         sds_free(val);
         ht_free(table);
         return 1;
@@ -71,28 +65,19 @@ static int run_self_test(void)
     skiplist *sl = sl_new();
     if (!sl) return 1;
     char *member = sds_new("member1");
-    if (!member) {
-        sl_free(sl);
-        return 1;
-    }
+    if (!member) { sl_free(sl); return 1; }
     if (sl_insert(sl, 1.5, "member1", member) < 0) {
         sds_free(member);
         sl_free(sl);
         return 1;
     }
-    if (sl_count(sl) != 1) {
-        sl_free(sl);
-        return 1;
-    }
+    if (sl_count(sl) != 1) { sl_free(sl); return 1; }
     sl_free(sl);
 
     list *l = list_new();
     if (!l) return 1;
     int *data = kave_malloc(sizeof(int));
-    if (!data) {
-        list_free(l);
-        return 1;
-    }
+    if (!data) { list_free(l); return 1; }
     *data = 42;
     list_append(l, data);
     list_free(l);
@@ -105,14 +90,8 @@ static int run_self_test(void)
     if (!is) return 1;
     is = intset_add(is, 30);
     if (!is) return 1;
-    if (intset_len(is) != 3) {
-        intset_free(is);
-        return 1;
-    }
-    if (!intset_find(is, 20)) {
-        intset_free(is);
-        return 1;
-    }
+    if (intset_len(is) != 3) { intset_free(is); return 1; }
+    if (!intset_find(is, 20)) { intset_free(is); return 1; }
     intset_free(is);
 
     resp_parser *p = resp_parser_new();
@@ -123,10 +102,7 @@ static int run_self_test(void)
         return 1;
     }
     resp_value *v = resp_parser_parse(p);
-    if (!v) {
-        resp_parser_free(p);
-        return 1;
-    }
+    if (!v) { resp_parser_free(p); return 1; }
     resp_value_free(v);
     resp_parser_free(p);
 
@@ -171,17 +147,11 @@ int main(int argc, char **argv)
         int matched = -1;
         if (arg[0] == '-' && arg[1] == '-') {
             for (int j = 0; options[j].long_opt; j++) {
-                if (strcmp(arg + 2, options[j].long_opt) == 0) {
-                    matched = j;
-                    break;
-                }
+                if (strcmp(arg + 2, options[j].long_opt) == 0) { matched = j; break; }
             }
         } else if (arg[0] == '-' && arg[1] != '\0') {
             for (int j = 0; options[j].long_opt; j++) {
-                if (arg[1] == options[j].short_opt) {
-                    matched = j;
-                    break;
-                }
+                if (arg[1] == options[j].short_opt) { matched = j; break; }
             }
         }
         if (matched < 0) {
@@ -215,14 +185,10 @@ int main(int argc, char **argv)
                 default: break;
             }
         } else {
-            if (options[matched].short_opt == 'a') {
-                cfg.enable_aof = 1;
-            }
+            if (options[matched].short_opt == 'a') cfg.enable_aof = 1;
         }
     }
-    if (run_test) {
-        return run_self_test();
-    }
+    if (run_test) return run_self_test();
     if (cfg.port <= 0 || cfg.port > 65535) {
         fprintf(stderr, "Invalid port: %d\n", cfg.port);
         return 1;
