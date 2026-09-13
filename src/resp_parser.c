@@ -214,20 +214,16 @@ static resp_value *resp_parse_impl(resp_parser *p)
             v = kave_malloc(sizeof(resp_value));
             if (!v) return NULL;
             v->type = RESP_STRING;
-            v->string = kave_malloc(line_len + 1);
+            v->string = sds_new_len(line, line_len);
             if (!v->string) { kave_free(v); return NULL; }
-            memcpy(v->string, line, line_len);
-            v->string[line_len] = '\0';
             return v;
         case '-':
             if (resp_read_line(p, &line, &line_len) < 0) return NULL;
             v = kave_malloc(sizeof(resp_value));
             if (!v) return NULL;
             v->type = RESP_ERROR;
-            v->string = kave_malloc(line_len + 1);
+            v->string = sds_new_len(line, line_len);
             if (!v->string) { kave_free(v); return NULL; }
-            memcpy(v->string, line, line_len);
-            v->string[line_len] = '\0';
             return v;
         case ':':
             if (resp_read_line(p, &line, &line_len) < 0) return NULL;
@@ -286,7 +282,7 @@ void resp_value_free(resp_value *v)
     switch (v->type) {
         case RESP_STRING:
         case RESP_ERROR:
-            if (v->string) kave_free(v->string);
+            if (v->string) sds_free(v->string);
             break;
         case RESP_BULK_STRING:
             if (v->bulk.ptr) kave_free(v->bulk.ptr);
