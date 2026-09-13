@@ -1,6 +1,7 @@
 #include "kave/hash_table.h"
 #include "kave/allocator.h"
 #include "kave/sds.h"
+#include "kave/skiplist.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -20,6 +21,17 @@ static uint64_t default_hash(const char *key, size_t len)
 static int default_key_eq(const char *a, size_t alen, const char *b, size_t blen)
 {
     return alen == blen && memcmp(a, b, alen) == 0;
+}
+
+static void ht_free_value(void *value, int kind)
+{
+    if (!value) return;
+    switch (kind) {
+        case HT_VAL_SDS: sds_free((sds)value); break;
+        case HT_VAL_SKIPLIST: sl_free((skiplist *)value); break;
+        case HT_VAL_RAW: kave_free(value); break;
+        default: break;
+    }
 }
 
 ht *ht_new(size_t initial_size)
@@ -49,7 +61,7 @@ void ht_free(ht *table)
         ht_entry *e = &table->entries[i];
         if (e->key) {
             kave_free(e->key);
-            if (e->value) sds_free((sds)e->value);
+            ht_free_value(e->value, e->value_kind);
         }
     }
     kave_free(table->entries);
@@ -63,15 +75,15 @@ static size_t ht_find_slot(const ht *table, const char *key, size_t key_len, uin
     for (size_t i = 0; i < table->size; i++) {
         size_t pos = (idx + i) & table->mask;
         ht_entry *e = &table->entries[pos];
+        if (e->deleted) {
+            if (first_deleted == table->size) first_deleted = pos;
+            continue;
+        }
         if (!e->key) {
             if (for_insert) {
                 return (first_deleted < table->size) ? first_deleted : pos;
             }
             return table->size;
-        }
-        if (e->deleted) {
-            if (first_deleted == table->size) first_deleted = pos;
-            continue;
         }
         if (e->hash == hash && table->key_eq(e->key, e->key_len, key, key_len)) {
             return pos;
@@ -80,7 +92,7 @@ static size_t ht_find_slot(const ht *table, const char *key, size_t key_len, uin
     return first_deleted;
 }
 
-int ht_insert(ht *table, const char *key, size_t key_len, void *value)
+int ht_insert(ht *table, const char *key, size_t key_len, void *value, int value_kind)
 {
     if (!table || !key) return -1;
     if ((double)(table->used + 1) / table->size > HT_LOAD_FACTOR) {
@@ -91,8 +103,9 @@ int ht_insert(ht *table, const char *key, size_t key_len, void *value)
     if (slot >= table->size) return -1;
     ht_entry *e = &table->entries[slot];
     if (e->key) {
-        if (e->value) sds_free((sds)e->value);
+        ht_free_value(e->value, e->value_kind);
         e->value = value;
+        e->value_kind = value_kind;
         return 0;
     }
     e->key = kave_malloc(key_len + 1);
@@ -102,6 +115,7 @@ int ht_insert(ht *table, const char *key, size_t key_len, void *value)
     e->key_len = key_len;
     e->hash = hash;
     e->value = value;
+    e->value_kind = value_kind;
     e->deleted = 0;
     table->used++;
     return 0;
@@ -126,10 +140,9 @@ int ht_delete(ht *table, const char *key, size_t key_len)
     e->deleted = 1;
     kave_free(e->key);
     e->key = NULL;
-    if (e->value) {
-        sds_free((sds)e->value);
-        e->value = NULL;
-    }
+    ht_free_value(e->value, e->value_kind);
+    e->value = NULL;
+    e->value_kind = HT_VAL_NONE;
     table->used--;
     return 0;
 }
@@ -159,7 +172,7 @@ void ht_rehash(ht *table, size_t new_size)
                 table->used++;
             } else {
                 kave_free(e->key);
-                if (e->value) sds_free((sds)e->value);
+                ht_free_value(e->value, e->value_kind);
             }
         }
     }
