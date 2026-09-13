@@ -9,6 +9,8 @@
 #define RESP_PARSE_INITIAL 4096
 #define RESP_PARSE_MAX 1048576
 
+static resp_value *resp_parse_impl(resp_parser *p);
+
 static int resp_parser_grow(resp_parser *p, size_t needed)
 {
     if (needed <= p->buf_cap) return 0;
@@ -78,7 +80,7 @@ static long long resp_parse_int(const char *s, size_t len)
         i++;
     }
     for (; i < len; i++) {
-        if (!isdigit(s[i])) return 0;
+        if (!isdigit((unsigned char)s[i])) return 0;
         n = n * 10 + (s[i] - '0');
     }
     return n * sign;
@@ -109,13 +111,22 @@ static resp_value *resp_parse_bulk(resp_parser *p, size_t len)
     return v;
 }
 
+static void resp_free_array_partial(resp_value *v)
+{
+    for (size_t j = 0; j < v->array.count; j++) {
+        resp_value_free(v->array.items[j]);
+    }
+    kave_free(v->array.items);
+    kave_free(v);
+}
+
 static resp_value *resp_parse_array(resp_parser *p, size_t count)
 {
     if (count > 1024) return NULL;
     resp_value *v = kave_malloc(sizeof(resp_value));
     if (!v) return NULL;
     v->type = RESP_ARRAY;
-    v->array.items = kave_calloc(count, sizeof(resp_value *));
+    v->array.items = kave_calloc(count > 0 ? count : 1, sizeof(resp_value *));
     if (!v->array.items) {
         kave_free(v);
         return NULL;
@@ -124,11 +135,7 @@ static resp_value *resp_parse_array(resp_parser *p, size_t count)
     for (size_t i = 0; i < count; i++) {
         resp_value *item = resp_parser_parse(p);
         if (!item) {
-            for (size_t j = 0; j < v->array.count; j++) {
-                resp_value_free(v->array.items[j]);
-            }
-            kave_free(v->array.items);
-            kave_free(v);
+            resp_free_array_partial(v);
             return NULL;
         }
         v->array.items[i] = item;
@@ -137,9 +144,63 @@ static resp_value *resp_parse_array(resp_parser *p, size_t count)
     return v;
 }
 
+static resp_value *resp_parse_map(resp_parser *p, size_t count)
+{
+    if (count > 1024) return NULL;
+    resp_value *v = kave_malloc(sizeof(resp_value));
+    if (!v) return NULL;
+    v->type = RESP_MAP;
+    v->map.keys = kave_calloc(count > 0 ? count : 1, sizeof(resp_value *));
+    v->map.values = kave_calloc(count > 0 ? count : 1, sizeof(resp_value *));
+    if (!v->map.keys || !v->map.values) {
+        if (v->map.keys) kave_free(v->map.keys);
+        if (v->map.values) kave_free(v->map.values);
+        kave_free(v);
+        return NULL;
+    }
+    v->map.count = 0;
+    for (size_t i = 0; i < count; i++) {
+        resp_value *key = resp_parser_parse(p);
+        if (!key) {
+            for (size_t j = 0; j < v->map.count; j++) {
+                resp_value_free(v->map.keys[j]);
+                resp_value_free(v->map.values[j]);
+            }
+            kave_free(v->map.keys);
+            kave_free(v->map.values);
+            kave_free(v);
+            return NULL;
+        }
+        resp_value *val = resp_parser_parse(p);
+        if (!val) {
+            resp_value_free(key);
+            for (size_t j = 0; j < v->map.count; j++) {
+                resp_value_free(v->map.keys[j]);
+                resp_value_free(v->map.values[j]);
+            }
+            kave_free(v->map.keys);
+            kave_free(v->map.values);
+            kave_free(v);
+            return NULL;
+        }
+        v->map.keys[i] = key;
+        v->map.values[i] = val;
+        v->map.count++;
+    }
+    return v;
+}
+
 resp_value *resp_parser_parse(resp_parser *p)
 {
     if (!p || p->pos >= p->buf_len) return NULL;
+    size_t saved = p->pos;
+    resp_value *v = resp_parse_impl(p);
+    if (!v) p->pos = saved;
+    return v;
+}
+
+static resp_value *resp_parse_impl(resp_parser *p)
+{
     char type = p->buffer[p->pos];
     p->pos++;
     if (p->pos >= p->buf_len) return NULL;
@@ -154,10 +215,7 @@ resp_value *resp_parser_parse(resp_parser *p)
             if (!v) return NULL;
             v->type = RESP_STRING;
             v->string = kave_malloc(line_len + 1);
-            if (!v->string) {
-                kave_free(v);
-                return NULL;
-            }
+            if (!v->string) { kave_free(v); return NULL; }
             memcpy(v->string, line, line_len);
             v->string[line_len] = '\0';
             return v;
@@ -167,10 +225,7 @@ resp_value *resp_parser_parse(resp_parser *p)
             if (!v) return NULL;
             v->type = RESP_ERROR;
             v->string = kave_malloc(line_len + 1);
-            if (!v->string) {
-                kave_free(v);
-                return NULL;
-            }
+            if (!v->string) { kave_free(v); return NULL; }
             memcpy(v->string, line, line_len);
             v->string[line_len] = '\0';
             return v;
@@ -218,48 +273,8 @@ resp_value *resp_parser_parse(resp_parser *p)
         case '|':
             if (resp_read_line(p, &line, &line_len) < 0) return NULL;
             n = resp_parse_int(line, line_len);
-            if (n < 0 || n > 1024) return NULL;
-            v = kave_malloc(sizeof(resp_value));
-            if (!v) return NULL;
-            v->type = RESP_MAP;
-            v->map.keys = kave_calloc((size_t)n, sizeof(resp_value *));
-            v->map.values = kave_calloc((size_t)n, sizeof(resp_value *));
-            if (!v->map.keys || !v->map.values) {
-                if (v->map.keys) kave_free(v->map.keys);
-                if (v->map.values) kave_free(v->map.values);
-                kave_free(v);
-                return NULL;
-            }
-            v->map.count = 0;
-            for (size_t i = 0; i < (size_t)n; i++) {
-                resp_value *key = resp_parser_parse(p);
-                if (!key) {
-                    for (size_t j = 0; j < v->map.count; j++) {
-                        resp_value_free(v->map.keys[j]);
-                        resp_value_free(v->map.values[j]);
-                    }
-                    kave_free(v->map.keys);
-                    kave_free(v->map.values);
-                    kave_free(v);
-                    return NULL;
-                }
-                resp_value *val = resp_parser_parse(p);
-                if (!val) {
-                    resp_value_free(key);
-                    for (size_t j = 0; j < v->map.count; j++) {
-                        resp_value_free(v->map.keys[j]);
-                        resp_value_free(v->map.values[j]);
-                    }
-                    kave_free(v->map.keys);
-                    kave_free(v->map.values);
-                    kave_free(v);
-                    return NULL;
-                }
-                v->map.keys[i] = key;
-                v->map.values[i] = val;
-                v->map.count++;
-            }
-            return v;
+            if (n < 0) return NULL;
+            return resp_parse_map(p, (size_t)n);
         default:
             return NULL;
     }
