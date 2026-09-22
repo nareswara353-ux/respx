@@ -3,6 +3,7 @@ project(kave VERSION 0.1.0 LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic -Werror -std=c11 -D_GNU_SOURCE")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -gdwarf-4")
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 include_directories(include)
 
