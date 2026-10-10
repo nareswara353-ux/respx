@@ -25,3 +25,8 @@ Testing/
 core
 vgcore.*
 valgrind-out.txt
+
+.env
+vendor/bundle
+node_modules
+.DS_Store
